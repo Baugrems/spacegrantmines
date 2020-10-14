@@ -50,7 +50,7 @@ void setup() {
   pinMode(motorPWM, OUTPUT);
   Serial.begin(9600);
 
-  rotate(1, 0, 0.5);
+  rotate(5, 0, 0.5);
 }
 
 void loop() {
