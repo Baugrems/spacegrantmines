@@ -51,12 +51,16 @@ long stopTick = 0;
 long servoStartTick = 0;
 long servoStopTick = 0;
 
-long requestQueue;
+long requestQueue = -1;
 
 //This is used to know what information the pi is requesting when it gets a request 
 int8_t requestType = -1;
 
 bool turnDirection;
+
+bool responseRequested = false;
+bool wheelDone = false;
+bool turnDone = false;
 
 //Function rotates the drive motor a specified number of revolutions
 void rotate(float revolutions, bool direction = 0, float speed = 1.0){
@@ -120,6 +124,11 @@ void loop() {
     digitalWrite(motorIn2, LOW);
     analogWrite(motorPWM, 255);
 
+    if(responseRequested){
+      wheelDone = true;
+      responseRequested = false;
+    }
+
     stopTick = 0;
   }
 
@@ -129,6 +138,10 @@ void loop() {
     digitalWrite(servoIn2, LOW);
     analogWrite(servoPWM, 255);
 
+    if(responseRequested){
+      turnDone = true;
+      responseRequested = false;
+    }
     servoStopTick = 0;
   }
 
@@ -191,6 +204,19 @@ void receiveEvent(int numBytes){
     return;
   }else if(first == 8){
     requestQueue = (long)(1000*servoEnc->read()*360*servoGearRatio/servoTicksPerRevolution);
+    return;
+  }else if(first == 9){
+    if(wheelDone){
+      requestQueue = 1;
+      turnDone = false;
+    }else if(turnDone){
+      requestQueue = 0;
+      turnDone = false;
+    }else{
+      requestQueue = -1;
+      responseRequested = true;
+    }
+    return;
   }
   for(int i = 0; Wire.available(); i++){
     input[i] = Wire.read();

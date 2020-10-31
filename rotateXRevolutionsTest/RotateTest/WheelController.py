@@ -1,4 +1,4 @@
-import smbus, time, struct
+import smbus, time, struct, threading
 
 #This script contains the class Wheel which contains information and functions so that the wheels can be controlled at a high level.
 #The constructor requires the byte adress of the wheel and an smbus.SMBus object used for the I2C bus.
@@ -53,10 +53,14 @@ class Wheel:
         this.forwardDir = forwardDir
         this.rightDir = rightDir
         
-        if getDirection:
-            this.resetRotation(setDirection = True)
+        this.responseFailed = False
+        this.wheelMotorResponded = False
+        this.turnMotorResponded = False
         
-    def rotate(this, revolutions, direction = "Forward"):
+        if setDirection:
+            this.resetRotation(setDirection = True, responseFcn = lambda a: None)
+        
+    def rotate(this, revolutions, direction = "Forward", responseFcn = 0):
         lowerDir = this.forwardDir
         
         if revolutions < 0:
@@ -76,6 +80,8 @@ class Wheel:
         
         this.bus.write_i2c_block_data(this.address, 0x00, [len(revolutionsBase)] + revolutionsBase + [revolutionsExponent, lowerDir])
         
+        threading.Thread(target = this.waitForResponse, args = (revolutions, responseFcn,)).start()
+        
     def on(this, direction = "Forward"):
         
         lowerDir = this.forwardDir
@@ -88,7 +94,7 @@ class Wheel:
     def off(this):
         this.bus.write_i2c_block_data(this.address, 0x03, [])
         
-    def turnWheel(this, deg, direction = "Right"):
+    def turnWheel(this, deg, direction = "Right", responseFcn = 0):
         lowerDir = this.rightDir
         
         if deg < 0:
@@ -107,15 +113,19 @@ class Wheel:
             
         this.bus.write_i2c_block_data(this.address, 0x04, [len(degBase)] + degBase + [degExp, lowerDir])
         
-    def resetRotation(this, setDirection = False):
+        threading.Thread(target = this.waitForResponse, args = (deg*0.5, responseFcn,)).start()
+        
+    def resetRotation(this, setDirection = False, responseFcn = 0):
         if setDirection:
-            this.bus.write_i2c_block_data(this.address, 0x04, [4] + [0, 0, 0, 1, 0, 1])
+            this.bus.write_i2c_block_data(this.address, 0x04, [4] + [0, 0, 0, 255, 0, 1])
             time.sleep(.1)
             this.bus.write_i2c_block_data(this.address, 0x05, [])
         else:
             this.bus.write_i2c_block_data(this.address, 0x06, [])
             
-    def setRotation(this, deg, direction = "Right"):
+        threading.Thread(target = this.waitForResponse, args = (20, responseFcn,)).start()
+            
+    def setRotation(this, deg, direction = "Right", responseFcn = 0):
         lowerDir = this.rightDir
         
         if deg < 0:
@@ -134,7 +144,41 @@ class Wheel:
             
         this.bus.write_i2c_block_data(this.address, 0x07, [len(degBase)] + degBase + [degExp, lowerDir])
         
-    
+        threading.Thread(target = this.waitForResponse, args = (deg*.5, responseFcn,)).start()
+        
+    def waitForResponse(this, timeout = 2, finishFcn = 0):
+        timestep = 0.05
+        while True:
+            try:
+                data = this.bus.read_i2c_block_data(this.address, 0x09, 1)
+                data = int.from_bytes(data, byteorder = 'little', signed = True)
+                if data == 0 or data == 1:
+                    break
+            except:
+                if isinstance(finishFcn, int):
+                    this.responseFailed = True
+                else:
+                    finishFcn(True)
+                return
+                continue
+            if(timeout <= 0):
+                if isinstance(finishFcn, int):
+                    this.responseFailed = True
+                else:
+                    finishFcn(True)
+                return
+            
+            time.sleep(timestep)
+            timeout -= timestep
+        if isinstance(finishFcn, int):
+            if data:
+                this.wheelMotorResponded = True
+            else:
+                this.turnMotorResponded = True
+        else:
+            finishFcn(False)
+        
+        
         
     def getPosition(this):
         data = this.bus.read_i2c_block_data(this.address, 1, 4)
@@ -155,4 +199,19 @@ class Wheel:
             data *= -1
         
         return data
+    
+    def isWheelMotorDone(this):
+        temp = this.wheelMotorResponded
+        this.wheelMotorResponded = False
+        return temp
+    
+    def isTurnMotorDone(this):
+        temp = this.turnMotorResponded
+        this.turnMotorResponded = False
+        return temp
+    
+    def responseHasFailed(this):
+        temp = this.responseFailed
+        this.responseFailed = False
+        return temp
 test = Wheel(0x04, smbus.SMBus(1))
