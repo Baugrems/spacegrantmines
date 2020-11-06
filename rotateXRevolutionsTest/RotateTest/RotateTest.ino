@@ -62,6 +62,9 @@ bool responseRequested = false;
 bool wheelDone = false;
 bool turnDone = false;
 
+const long driveMotorDoneCode = 500;
+const long turnMotorDoneCode = 600;
+
 //Function rotates the drive motor a specified number of revolutions
 void rotate(float revolutions, bool direction = 0, float speed = 1.0){
   analogWrite(motorPWM, (int)(speed*255));
@@ -207,10 +210,10 @@ void receiveEvent(int numBytes){
     return;
   }else if(first == 9){
     if(wheelDone){
-      requestQueue = 1;
-      turnDone = false;
+      requestQueue = driveMotorDoneCode;
+      wheelDone = false;
     }else if(turnDone){
-      requestQueue = 0;
+      requestQueue = turnMotorDoneCode;
       turnDone = false;
     }else{
       requestQueue = -1;
@@ -335,4 +338,5 @@ void receiveEvent(int numBytes){
 //requestType should have been set in the recieveEvent function just before this is called
 void requestEvent(){
   Wire.write((byte*)&requestQueue, sizeof(requestQueue));
+  requestQueue = -1;
 }
