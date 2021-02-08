@@ -16,40 +16,44 @@
  *  
  */
 
-#define ENCODER_OPTIMIZE_INTERRUPTS
+//#define ENCODER_OPTIMIZE_INTERRUPTS
 #include <Encoder.h>
 #include <Wire.h>
 #include <math.h>
 
-#define encoderA 2
-#define encoderB 3
+#define encoderA 10
+#define encoderB 6
 #define motorIn1 4
 #define motorIn2 5
-#define motorPWM 6
+//#define motorPWM 6
 
-#define servoEncoderA 2
-#define servoEncoderB 3
-#define servoIn1 4
-#define servoIn2 5
-#define servoPWM 6
+#define smallEncoder 3
+//#define smallEncoderB 7
+#define smallIn1 8
+#define smallIn2 9
+//#define smallPWM 6
+
+#define limitSwitch 2
 
 #define ADDRESS 4
 
 //Amount of encoder pulses per revolution
 //This number is experimentally found and probably not accurate but I cant find a specs sheet on the encoder for the big motor so this is what im working with
 #define ticksPerRevolution 10200
-#define servoTicksPerRevolution 10200
-#define servoGearRatio 26.5936/464.10877 //From CAD
 
 Encoder* enc = new Encoder(encoderA, encoderB);
-Encoder* servoEnc = enc;// = new Encoder(servoEncoderA, servoEncoderB);
+//Encoder* smallEnc = enc;// = new Encoder(smallEncoderA, smallEncoderB);
+long smallEnc = 0;
+
+unsigned int smallTicksPerRevolution = 1000;
+bool moveDir = 0;
 
 //startTick and stopTick are used to figure out when the motor started turning and when it should stop
 long startTick = 0;
 long stopTick = 0;
 
-long servoStartTick = 0;
-long servoStopTick = 0;
+long smallStartTick = 0;
+long smallStopTick = 0;
 
 long requestQueue = -1;
 
@@ -65,9 +69,13 @@ bool turnDone = false;
 const long driveMotorDoneCode = 500;
 const long turnMotorDoneCode = 600;
 
+uint8_t calibrationState = 0;
+bool pressed = false;
+unsigned long limitBuffer = 0;
+
 //Function rotates the drive motor a specified number of revolutions
 void rotate(float revolutions, bool direction = 0, float speed = 1.0){
-  analogWrite(motorPWM, (int)(speed*255));
+  //analogWrite(motorPWM, (int)(speed*255));
   if(direction){
     digitalWrite(motorIn1, HIGH);
     digitalWrite(motorIn2, LOW);
@@ -84,27 +92,34 @@ void rotate(float revolutions, bool direction = 0, float speed = 1.0){
 
 //Extremely similar to the rotate function except it takes in degrees instead of revolutions and calculates how many revolutions the motor needs to turn to get the wheel to turn that amount of degrees
 void turnWheel(float deg, bool direction = 0){
-  analogWrite(servoPWM, 255);
+  //analogWrite(smallPWM, 255);
+  moveDir = direction;
   if(direction){
-    digitalWrite(servoIn1, HIGH);
-    digitalWrite(servoIn2, LOW);
+    digitalWrite(smallIn1, HIGH);
+    digitalWrite(smallIn2, LOW);
   }else{
-    digitalWrite(servoIn1, LOW);
-    digitalWrite(servoIn2, HIGH);
+    digitalWrite(smallIn1, LOW);
+    digitalWrite(smallIn2, HIGH);
   }
 
-  servoStopTick = deg*servoTicksPerRevolution/(servoGearRatio*360);
-  servoStartTick = servoEnc->read();
+  smallStopTick = deg*smallTicksPerRevolution/360;
+  smallStartTick = smallEnc;
 }
 
 void setup() {
   //Init pins
   pinMode(motorIn1, OUTPUT);
   pinMode(motorIn2, OUTPUT);
-  pinMode(motorPWM, OUTPUT);
-  pinMode(servoIn1, OUTPUT);
-  pinMode(servoIn2, OUTPUT);
-  pinMode(servoPWM, OUTPUT);
+  //pinMode(motorPWM, OUTPUT);
+  pinMode(smallIn1, OUTPUT);
+  pinMode(smallIn2, OUTPUT);
+  //pinMode(smallPWM, OUTPUT);
+
+  pinMode(smallEncoder, INPUT);
+
+  pinMode(limitSwitch, INPUT);
+
+  
 
   //Join I2C with ADDRESS
   Wire.begin(ADDRESS);
@@ -115,17 +130,22 @@ void setup() {
 
   //Start serial bus
   Serial.begin(9600);
+
+  //Set encoder interrupt
+  attachInterrupt(digitalPinToInterrupt(smallEncoder), encInterrupt, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(limitSwitch), limitSwitchInterrupt, RISING);
   
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
 
+
   //Stop the drive motor if enough ticks have passed
   if(stopTick && abs(startTick - enc->read()) > abs(stopTick)){
     digitalWrite(motorIn1, LOW);
     digitalWrite(motorIn2, LOW);
-    analogWrite(motorPWM, 255);
+    //analogWrite(motorPWM, 255);
 
     if(responseRequested){
       wheelDone = true;
@@ -135,18 +155,44 @@ void loop() {
     stopTick = 0;
   }
 
-  //Stop the servo motor if enough ticks have passed
-  if(servoStopTick && abs(servoStartTick - servoEnc->read()) > abs(servoStopTick)){
-    digitalWrite(servoIn1, LOW);
-    digitalWrite(servoIn2, LOW);
-    analogWrite(servoPWM, 255);
+  //Stop the small motor if enough ticks have passed
+  if(smallStopTick && abs(smallStartTick - smallEnc) > abs(smallStopTick)){
+    digitalWrite(smallIn1, LOW);
+    digitalWrite(smallIn2, LOW);
+    //analogWrite(smallPWM, 255);
 
     if(responseRequested){
       turnDone = true;
       responseRequested = false;
     }
-    servoStopTick = 0;
+    smallStopTick = 0;
   }
+  
+  if(pressed){
+    pressed = false;
+
+    if(millis() - limitBuffer < 1000){
+      limitBuffer = millis();
+      return;
+    }
+    limitBuffer = millis();
+    Serial.println("Pressed");
+
+    if(!calibrationState) return;
+  
+    if(calibrationState == 1){
+      smallEnc = 0;
+      calibrationState = 2;
+    }else if(calibrationState == 2){
+      smallTicksPerRevolution = abs(smallEnc);
+      smallEnc = 0;
+      digitalWrite(smallIn1, LOW);
+      digitalWrite(smallIn2, LOW);
+      calibrationState = 0;
+    }
+  }
+
+  //Serial.println(smallEnc);
 
   //Serial.println(requestQueue);
 }
@@ -202,11 +248,13 @@ void receiveEvent(int numBytes){
   byte input[numBytes - 1];
   byte first = Wire.read();
 
+  Serial.println(first);
+
   if(first == 1){
     requestQueue = (long)(1000*enc->read()/ticksPerRevolution);
     return;
   }else if(first == 8){
-    requestQueue = (long)(1000*servoEnc->read()*360*servoGearRatio/servoTicksPerRevolution);
+    requestQueue = (long)(1000*smallEnc*360/smallTicksPerRevolution);
     return;
   }else if(first == 9){
     if(wheelDone){
@@ -254,7 +302,7 @@ void receiveEvent(int numBytes){
     if(numBytes > 1) dir = input[0];
 
     //Turn the motor on
-    analogWrite(motorPWM, 255);
+    //analogWrite(motorPWM, 255);
     if(dir){
       digitalWrite(motorIn1, HIGH);
       digitalWrite(motorIn2, LOW);
@@ -275,57 +323,46 @@ void receiveEvent(int numBytes){
     
     //Call the rotate function
     turnWheel(revolutions, direction);
-  }else if(first == 5){ //Return to position 0 and calibrate the encoder
-    //Figure out which direction corresponds to positive or negative encoder output
-    long initialPos = servoEnc->read();
-    digitalWrite(servoIn1, HIGH);
-    digitalWrite(servoIn2, LOW);
-    delay(100);
-    turnDirection = servoEnc->read() > initialPos;
-    digitalWrite(servoIn1, LOW);
-    if(servoEnc->read() <= initialPos + 1 and servoEnc->read() >= initialPos - 1){
-      Serial.println("Warning: Encoder output between -1 and 1. There is probably an error.");
-    }
-
-    //Return back to position 0
-    if(turnDirection == servoEnc->read() > 0){
-      digitalWrite(servoIn2, HIGH);
-    }else{
-      digitalWrite(servoIn1, HIGH);
-    }
-    servoStartTick = servoEnc->read();
-    servoStopTick = servoEnc->read();
+  }else if(first == 5){
+    moveDir = true;
+    digitalWrite(smallIn1, HIGH);
+    digitalWrite(smallIn2, LOW);
+    calibrationState = 1;
   }else if(first == 6){ //Return to position 0 without calibrating the encoder
-    if(servoEnc->read() <= 1 && servoEnc->read() >= -1){
+    if(smallEnc <= 1 && smallEnc >= -1){
       return;
     }
 
-    if(servoEnc->read() > 0 == turnDirection){
-      digitalWrite(servoIn1, LOW);
-      digitalWrite(servoIn2, HIGH);
+    if(smallEnc > 0){
+      digitalWrite(smallIn1, LOW);
+      digitalWrite(smallIn2, HIGH);
+      moveDir = false;
     }else{
-      digitalWrite(servoIn1, HIGH);
-      digitalWrite(servoIn2, LOW);
+      digitalWrite(smallIn1, HIGH);
+      digitalWrite(smallIn2, LOW);
+      moveDir = true;
     }
 
-    servoStartTick = servoEnc->read();
-    servoStopTick = servoEnc->read();
+    smallStartTick = smallEnc;
+    smallStopTick = smallEnc;
   }else if(first == 7){ //Rotate to a specified number of degrees
 
     float revolutions;
     bool direction;
     getFloatAndDir(numBytes, input, &revolutions, &direction);
     
-    if(servoEnc->read() > (2*(direction) - 1)*revolutions*servoTicksPerRevolution/(servoGearRatio*360) == turnDirection){
-      digitalWrite(servoIn1, LOW);
-      digitalWrite(servoIn2, HIGH);
+    if(smallEnc < (2*(direction) - 1)*revolutions*smallTicksPerRevolution/360 == turnDirection){
+      digitalWrite(smallIn1, LOW);
+      digitalWrite(smallIn2, HIGH);
+      moveDir = false;
     }else{
-      digitalWrite(servoIn1, HIGH);
-      digitalWrite(servoIn2, LOW);
+      digitalWrite(smallIn1, HIGH);
+      digitalWrite(smallIn2, LOW);
+      moveDir = true;
     }
     
-    servoStartTick = servoEnc->read();
-    servoStopTick = abs(servoEnc->read() - (2*(direction) - 1)*revolutions*servoTicksPerRevolution/(servoGearRatio*360));
+    smallStartTick = smallEnc;
+    smallStopTick = abs(smallEnc - (2*(direction) - 1)*revolutions*smallTicksPerRevolution/360);
 
     
   }else{//Function not found
@@ -339,4 +376,14 @@ void receiveEvent(int numBytes){
 void requestEvent(){
   Wire.write((byte*)&requestQueue, sizeof(requestQueue));
   requestQueue = -1;
+}
+
+void encInterrupt(){
+  if(moveDir) smallEnc++;
+  else smallEnc--;
+}
+
+void limitSwitchInterrupt(){
+  pressed = true;
+  
 }
