@@ -171,7 +171,7 @@ void loop() {
   if(pressed){
     pressed = false;
 
-    if(millis() - limitBuffer < 1000){
+    if(millis() - limitBuffer < 200){
       limitBuffer = millis();
       return;
     }
@@ -189,6 +189,19 @@ void loop() {
       digitalWrite(smallIn1, LOW);
       digitalWrite(smallIn2, LOW);
       calibrationState = 0;
+      if(responseRequested){
+        turnDone = true;
+        responseRequested = false;
+      }
+    }else if(calibrationState == 3){
+      smallEnc = 0;
+      digitalWrite(smallIn1, LOW);
+      digitalWrite(smallIn2, LOW);
+      calibrationState = 0;
+      if(responseRequested){
+        turnDone = true;
+        responseRequested = false;
+      }
     }
   }
 
@@ -206,10 +219,10 @@ void getFloatAndDir(int numBytes, byte* input, float* outputFloat, bool* outputB
   //I2C cannot transmit floats/doubles (at least without some pre and post processing) so they have to be converted into an int and an exponent of 10
   //revolutionsBase is the int and revolutionsExponent is the exponent of 10, so the final float is revolutionsBase*10^revolutionsExponent
   //It would have been easier to just get a refrence to the float, cast int* to the pointer and derefrence it to get an integer and send that int over but python cant do that so we have to deal with this method.
-  int revolutionsBase;
+  long revolutionsBase;
   int8_t revolutionsExponent;
   if(numBytes > 1){ //Make sure message included the amount of revolutions
-    byte intIn[4]; //An int is 4 bytes so make an array of those 4 bytes
+    byte intIn[4] = {0, 0, 0, 0}; //An int is 4 bytes so make an array of those 4 bytes
 
     //The sender may have sent the base in more or less than 4 bytes so we transpose those bytes into the new array with max length of 4
     //The first byte specifies how many bytes the int is stored in. Anything beyond 4 bytes will be truncated but I doubt were ever gonna tell it to rotate 2147483.647 times
@@ -219,7 +232,8 @@ void getFloatAndDir(int numBytes, byte* input, float* outputFloat, bool* outputB
     }
 
     //Convert the byte array to an int
-    revolutionsBase = *(int*)intIn;
+    revolutionsBase = *(long*)intIn;
+    Serial.println(revolutionsBase);
     revolutionsExponent = 0;
 
     if(numBytes >= intInLength + 3){ //If enough arguments exist, the last one should be the direction and should be the last argument so set the direction to that
@@ -248,8 +262,6 @@ void receiveEvent(int numBytes){
   byte input[numBytes - 1];
   byte first = Wire.read();
 
-  Serial.println(first);
-
   if(first == 1){
     requestQueue = (long)(1000*enc->read()/ticksPerRevolution);
     return;
@@ -271,7 +283,10 @@ void receiveEvent(int numBytes){
   }
   for(int i = 0; Wire.available(); i++){
     input[i] = Wire.read();
+    Serial.print(input[i]);
+    Serial.print(", ");
   }
+  Serial.print('\n');
 
   //This is basically just a switch statement for each command the Pi could send over
   //I realize this should be a switch statement but for whatever reason doing it as one refused to work so its an if ... else if ... statement
@@ -292,8 +307,6 @@ void receiveEvent(int numBytes){
     
     //Call the rotate function
     rotate(revolutions, direction);
-  }else if(first == 1){ //Request position
-    requestQueue = (int)(1000*enc->read()/ticksPerRevolution); //Set the request type, the request function should automatically be run immediately
   }else if(first == 2){ //On
     //Only argument for this is the direction (0 or 1) and is optional
     bool dir = 0;
@@ -320,7 +333,8 @@ void receiveEvent(int numBytes){
     float revolutions;
     bool direction;
     getFloatAndDir(numBytes, input, &revolutions, &direction);
-    
+
+    Serial.println(revolutions);
     //Call the rotate function
     turnWheel(revolutions, direction);
   }else if(first == 5){
@@ -333,7 +347,7 @@ void receiveEvent(int numBytes){
       return;
     }
 
-    if(smallEnc > 0){
+    if((smallEnc%smallTicksPerRevolution < smallTicksPerRevolution/2) != (smallEnc < 0)){
       digitalWrite(smallIn1, LOW);
       digitalWrite(smallIn2, HIGH);
       moveDir = false;
@@ -343,8 +357,7 @@ void receiveEvent(int numBytes){
       moveDir = true;
     }
 
-    smallStartTick = smallEnc;
-    smallStopTick = smallEnc;
+    calibrationState = 3;
   }else if(first == 7){ //Rotate to a specified number of degrees
 
     float revolutions;

@@ -61,7 +61,7 @@ class Wheel:
         this.turnMotorDoneCode = 600
         
         if setDirection:
-            this.resetRotation(setDirection = True, responseFcn = lambda a: None)
+            this.resetRotation(setDirection = True, responseFcn = lambda a: print("Calibration Failed") if a else None)
         
     #rotates the wheel the specified number of revolutions
     #direction can be set to "Backward" to move the opposite direction
@@ -82,10 +82,10 @@ class Wheel:
             lowerDir = not lowerDir
             
         if revolutions == revolutions//1:
-            revolutionsBase = list(revolutions.to_bytes(4, 'little'))
+            revolutionsBase = this.to_bytes(revolutions)
             revolutionsExponent = 0
         else:
-            revolutionsBase = list(int(1000*revolutions).to_bytes(4, 'little'))
+            revolutionsBase = this.to_bytes(int(1000*revolutions))
             revolutionsExponent = -3
         
         
@@ -116,11 +116,13 @@ class Wheel:
             lowerDir = not lowerDir
             
         if deg == deg//1:
-            degBase = list(deg.to_bytes(4, 'little'))
+            degBase = this.to_bytes(deg)
             degExp = 0
         else:
-            degBase = list(int(1000*deg).to_bytes(4, 'little'))
+            degBase = this.to_bytes(int(1000*deg))
             degExp = -3
+            
+        print(degBase, degExp)
             
         this.bus.write_i2c_block_data(this.address, 0x04, [len(degBase)] + degBase + [degExp, lowerDir])
         
@@ -145,10 +147,10 @@ class Wheel:
             lowerDir = not lowerDir
             
         if deg == deg//1:
-            degBase = list(deg.to_bytes(4, 'little'))
+            degBase = this.to_bytes(deg)
             degExp = 0
         else:
-            degBase = list(int(1000*deg).to_bytes(4, 'little'))
+            degBase = this.to_bytes(int(1000*deg))
             degExp = -3
             
         this.bus.write_i2c_block_data(this.address, 0x07, [len(degBase)] + degBase + [degExp, lowerDir])
@@ -157,6 +159,7 @@ class Wheel:
         
     def waitForResponse(this, finishFcn = 0):
         timestep = 0.05
+        time.sleep(timestep)
         while True:
             try:
                 data = this.bus.read_i2c_block_data(this.address, 0x09, 4)
@@ -181,8 +184,6 @@ class Wheel:
         else:
             finishFcn(False)
         
-        
-        
     def getPosition(this, callbackFcn = 0):
         data = this.bus.read_i2c_block_data(this.address, 1, 4)
         
@@ -197,7 +198,7 @@ class Wheel:
             callbackFcn(data)
     
     def getRotation(this, callbackFcn = 0):
-        data = this.bus.read_i2c_block_data(this.address, 8, 4)
+        data = this.bus.read_i2c_block_data(this.address, 0x08, 4)
         
         data = int.from_bytes(data, byteorder='little', signed = True)/1000
         
@@ -209,10 +210,10 @@ class Wheel:
         else:
             callbackFcn(data)
     
-    def getPositionAsync(this, callbackFcn):
+    def getPositionAsync(this, callbackFcn = 0):
         threading.Thread(target = this.getPosition, args = (callbackFcn,)).start()
         
-    def getRotationAsync(this, callbackFcn):
+    def getRotationAsync(this, callbackFcn = 0):
         threading.Thread(target = this.getRotation, args = (callbackFcn,)).start()
     
     def isWheelMotorDone(this):
@@ -229,5 +230,17 @@ class Wheel:
         temp = this.responseFailed
         this.responseFailed = False
         return temp
-test = Wheel(0x04, smbus.SMBus(1), setDirection=False)
+    
+    def to_bytes(this, num, byte = []):
+        if num.bit_length() <= 8:
+            byte = byte + [int(bin(num)[-8:], 2)]
+            print(byte)
+            return byte
+        byte = byte + [int(bin(num)[-8:], 2)]
+        num = int(bin(num)[0:-8], 2)
+        return this.to_bytes(num, byte)
+
+test = Wheel(0x04, smbus.SMBus(1), setDirection=True)
+
+
     
