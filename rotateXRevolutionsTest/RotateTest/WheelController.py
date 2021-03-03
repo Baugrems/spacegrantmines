@@ -270,7 +270,7 @@ class Wheel:
         num = int(bin(num)[0:-8], 2)
         return this.to_bytes(num, byte)
 
-test = Wheel(0x04, smbus.SMBus(1), setDirection=True)
+#test = Wheel(0x04, smbus.SMBus(1), setDirection=True)
 
 
     
