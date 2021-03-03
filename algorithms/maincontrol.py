@@ -17,7 +17,7 @@ def main():
 
 def turn_wheel(int wheel, float angle):
 
-def rotate_wheel(int wheel, float distance)
+def rotate_wheel(int wheel, float distance):
 
 def turn_robot(float angle):
 
