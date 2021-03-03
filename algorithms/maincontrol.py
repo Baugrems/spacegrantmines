@@ -1,4 +1,4 @@
-from spacegrantmines.rotateXRevolutions.RotateTest import Wheel as wc
+from spacegrantmines.rotateXRevolutions.RotateTest import WheelController as wc
 #do we need to have event checker things?
 
 def main():
