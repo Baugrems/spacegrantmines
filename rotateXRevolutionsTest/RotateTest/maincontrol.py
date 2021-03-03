@@ -5,7 +5,9 @@ def main():
     test = wc.Wheel(0x04, smbus.SMBus(1), setDirection=True)#calibration test
     #setup
     #run loop (threading?)
-    
+
+    #State machine to choose what to do
+    #While loop to execute current state
     #The process
     #get all inputs
     #Get beacon direction
