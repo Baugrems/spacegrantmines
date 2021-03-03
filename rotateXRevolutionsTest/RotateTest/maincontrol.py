@@ -1,10 +1,8 @@
-#import .spacegrantmines.rotateXRevolutions.RotateTest.import_test as wc
-#from ../ spacegrantmines.rotateXRevolutionsTest.RotateTest.import_test as wc
+import WheelController as wc
 #do we need to have event checker things?
 
 def main():
-    #test = wc.Wheel(0x04, smbus.SMBus(1), setDirection=True)#calibration test
-    wc.print_stuff()
+    test = wc.Wheel(0x04, smbus.SMBus(1), setDirection=True)#calibration test
     #setup
     #run loop (threading?)
     
