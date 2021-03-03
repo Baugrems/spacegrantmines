@@ -2,7 +2,7 @@ from spacegrantmines.rotateXRevolutions.RotateTest.WheelController as wc
 #do we need to have event checker things?
 
 def main():
-    test = wc.Wheel(0x04, smbus.SMBus(1), setDirection=True)
+    test = wc.Wheel(0x04, smbus.SMBus(1), setDirection=True)#calibration test
 
     #setup
     #run loop (threading?)
