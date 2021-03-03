@@ -1,11 +1,12 @@
-import WheelController as wc
+from spacegrantmines.rotateXRevolutions.RotateTest.WheelController as wc
 #do we need to have event checker things?
 
 def main():
+    test = wc.Wheel(0x04, smbus.SMBus(1), setDirection=True)
+
     #setup
     #run loop (threading?)
-
-
+    
     #The process
     #get all inputs
     #Get beacon direction
@@ -32,3 +33,5 @@ def get_beacon_direction():
 def get_laser_dist():
 
 def update_map():#we want to be near the center of the map
+
+main()
