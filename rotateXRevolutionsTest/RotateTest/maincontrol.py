@@ -1,8 +1,10 @@
-import WheelController as wc
+#import WheelController as wc
+import time
+import numpy as np
 #do we need to have event checker things?
 
 def main():
-    test = wc.Wheel(0x04, smbus.SMBus(1), setDirection=True)#calibration test
+    #test = wc.Wheel(0x04, smbus.SMBus(1), setDirection=True)#calibration test
     #setup
     #run loop (threading?)
 
@@ -15,8 +17,24 @@ def main():
     #if way ahead is clear, turn towards beacon and move forward
     #otherwise, update the map with new obstacle and path find a way around the obstacle to the beacon direction
 
+    arr = np.zeros(1000)
+    
+    run = True
+    initial_time = time.clock()
+    elapsed_time = 0
+    previous_time = 0
+    while run:
+        #we need a way to keep track of position
+        #initially, I'll set speed to be 1, so time is the measure of distance
+        #we'll do a tile per second
+        previous_time = elapsed_time;
+        elapsed_time = int(time.clock() - initial_time);
 
 
+        if previous_time != elapsed_time:
+            previous_time = elapsed_time
+            print(elapsed_time)
+    
 def turn_wheel(wheel, angle):
     #do nothing
     print("hello")
