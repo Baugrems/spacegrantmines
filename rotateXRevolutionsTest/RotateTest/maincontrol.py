@@ -17,7 +17,15 @@ def main():
     #if way ahead is clear, turn towards beacon and move forward
     #otherwise, update the map with new obstacle and path find a way around the obstacle to the beacon direction
 
-    arr = np.zeros(1000)
+
+    #MESSING AROUND WITH CODE
+    
+    buffer_dim = 1000 #size of buffer
+    frame_dim = 10 #size of viewing and pathing frame
+    map_buffer = np.zeros((buffer_dim,buffer_dim)) #make a board
+    frame_min = (int)(buffer_dim/2 - frame_dim/2) #viewing frame dimensions
+    frame_max = (int)(buffer_dim/2 + frame_dim/2)
+    print (map_buffer[frame_min:frame_max,frame_min:frame_max]) #prints viewing frame
     
     run = True
     initial_time = time.clock()
@@ -34,7 +42,12 @@ def main():
         if previous_time != elapsed_time:
             previous_time = elapsed_time
             print(elapsed_time)
-    
+
+
+
+
+
+            
 def turn_wheel(wheel, angle):
     #do nothing
     print("hello")
