@@ -18,19 +18,25 @@ def main():
     #otherwise, update the map with new obstacle and path find a way around the obstacle to the beacon direction
 
 
-    #MESSING AROUND WITH CODE
+    #MESSING AROUND WITH CODE    
+    buffer_dim = 10 #size of buffer
+    #frame_dim = 10 #size of viewing and pathing frame
+    value_map = np.zeros((buffer_dim,buffer_dim)) #make a board, a map of values that indicate how good a position is
+    field_map = np.zeros((buffer_dim,buffer_dim))
+
+    #frame_min = (int)(buffer_dim/2 - frame_dim/2) #viewing frame dimensions
+    #frame_max = (int)(buffer_dim/2 + frame_dim/2)
+    #print (map_buffer[frame_min:frame_max,frame_min:frame_max]) #prints viewing frame
+
+    #Distance is in cm, movement based on wheel rotations
+    beacon_position = (0,9)
+    value_map[beacon_position[0],beacon_position[1]] = 100#must be larger than twice the array size since the initial values are zeros
+    recursive_map_update(value_map, field_map, beacon_position[0],beacon_position[1])
+    print(value_map)
     
-    buffer_dim = 1000 #size of buffer
-    frame_dim = 10 #size of viewing and pathing frame
-    map_buffer = np.zeros((buffer_dim,buffer_dim)) #make a board
-    frame_min = (int)(buffer_dim/2 - frame_dim/2) #viewing frame dimensions
-    frame_max = (int)(buffer_dim/2 + frame_dim/2)
-    print (map_buffer[frame_min:frame_max,frame_min:frame_max]) #prints viewing frame
-    
-    run = True
-    initial_time = time.clock()
-    elapsed_time = 0
-    previous_time = 0
+    #init_pos = (500,500)
+    #move    
+    run = False
     while run:
         #we need a way to keep track of position
         #initially, I'll set speed to be 1, so time is the measure of distance
@@ -46,8 +52,27 @@ def main():
 
 
 
-
+def shift_map_update(field_map, beacon_dir):
+    print("stuff")
+    #remove column add column...
             
+def recursive_map_update(value_map, field_map, x, y):
+    if x + 1 < len(value_map) and value_map[x][y] - 1 > value_map[x + 1][y]:#if it exists and hasnt been updated
+        value_map[x + 1][y] = value_map[x][y] - 1
+        recursive_map_update(value_map, field_map, x + 1, y)
+        
+    if y + 1 < len(value_map) and value_map[x][y] - 1 > value_map[x][y + 1]:#if it exists and hasnt been updated
+        value_map[x][y + 1] = value_map[x][y] - 1
+        recursive_map_update(value_map, field_map, x, y + 1)
+        
+    if x - 1 >= 0 and value_map[x][y] - 1> value_map[x - 1][y]:#if it exists and hasnt been updated
+        value_map[x - 1][y] = value_map[x][y] - 1
+        recursive_map_update(value_map, field_map, x - 1, y)
+        
+    if y - 1 >= 0 and value_map[x][y] - 1 > value_map[x][y - 1]:#if it exists and hasnt been updated
+        value_map[x][y - 1] = value_map[x][y] - 1
+        recursive_map_update(value_map, field_map, x, y - 1)
+
 def turn_wheel(wheel, angle):
     #do nothing
     print("hello")
@@ -57,9 +82,17 @@ def rotate_wheel(wheel, distance):
 def turn_robot(angle):
     #do nothing
     print("workkkkk")
+    
 def move_robot(distance):
     #do nothing
     print("workkkkk")
+    #distance in wheel rotations and angle in 45 degree increments
+    #update current position based on direction moved
+    #update map (ie delete and add rows)
+
+    #move in small increments and check if there is a collision
+        #if there is a collision/interrupt add an x to a location and reroute
+    
 def get_beacon_angle():
     #do nothing
     print("workkkkk")
