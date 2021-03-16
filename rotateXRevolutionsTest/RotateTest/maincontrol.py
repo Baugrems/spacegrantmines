@@ -19,7 +19,7 @@ def main():
 
 
     #MESSING AROUND WITH CODE    
-    buffer_dim = 10 #size of buffer
+    buffer_dim = 100 #size of buffer
     #frame_dim = 10 #size of viewing and pathing frame
     value_map = np.zeros((buffer_dim,buffer_dim)) #make a board, a map of values that indicate how good a position is
     field_map = np.zeros((buffer_dim,buffer_dim))
@@ -29,9 +29,10 @@ def main():
     #print (map_buffer[frame_min:frame_max,frame_min:frame_max]) #prints viewing frame
 
     #Distance is in cm, movement based on wheel rotations
-    beacon_position = (0,9)
-    value_map[beacon_position[0],beacon_position[1]] = 100#must be larger than twice the array size since the initial values are zeros
-    recursive_map_update(value_map, field_map, beacon_position[0],beacon_position[1])
+    beacon_x = 0
+    beacon_y = 0
+    value_map[beacon_x][beacon_y] = 2000#must be larger than twice the array size since the initial values are zeros
+    recursive_map_update(value_map, field_map, beacon_x, beacon_y, 100)
     print(value_map)
     
     #init_pos = (500,500)
@@ -56,22 +57,22 @@ def shift_map_update(field_map, beacon_dir):
     print("stuff")
     #remove column add column...
             
-def recursive_map_update(value_map, field_map, x, y):
-    if x + 1 < len(value_map) and value_map[x][y] - 1 > value_map[x + 1][y]:#if it exists and hasnt been updated
+def recursive_map_update(value_map, field_map, x, y, call_limit):
+    if x + 1 < len(value_map) and value_map[x][y] - 1 > value_map[x + 1][y] and call_limit != 0:#if it exists and hasnt been updated
         value_map[x + 1][y] = value_map[x][y] - 1
-        recursive_map_update(value_map, field_map, x + 1, y)
+        recursive_map_update(value_map, field_map, x + 1, y, call_limit - 1)
         
-    if y + 1 < len(value_map) and value_map[x][y] - 1 > value_map[x][y + 1]:#if it exists and hasnt been updated
+    if y + 1 < len(value_map) and value_map[x][y] - 1 > value_map[x][y + 1] and call_limit != 0:#if it exists and hasnt been updated
         value_map[x][y + 1] = value_map[x][y] - 1
-        recursive_map_update(value_map, field_map, x, y + 1)
+        recursive_map_update(value_map, field_map, x, y + 1, call_limit - 1)
         
-    if x - 1 >= 0 and value_map[x][y] - 1> value_map[x - 1][y]:#if it exists and hasnt been updated
+    if x - 1 >= 0 and value_map[x][y] - 1> value_map[x - 1][y] and call_limit != 0:#if it exists and hasnt been updated
         value_map[x - 1][y] = value_map[x][y] - 1
-        recursive_map_update(value_map, field_map, x - 1, y)
+        recursive_map_update(value_map, field_map, x - 1, y, call_limit - 1)
         
-    if y - 1 >= 0 and value_map[x][y] - 1 > value_map[x][y - 1]:#if it exists and hasnt been updated
+    if y - 1 >= 0 and value_map[x][y] - 1 > value_map[x][y - 1] and call_limit != 0:#if it exists and hasnt been updated
         value_map[x][y - 1] = value_map[x][y] - 1
-        recursive_map_update(value_map, field_map, x, y - 1)
+        recursive_map_update(value_map, field_map, x, y - 1, call_limit - 1)
 
 def turn_wheel(wheel, angle):
     #do nothing
